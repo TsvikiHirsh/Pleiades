@@ -65,7 +65,11 @@ class LptFile:
                         # skip requested number of rows
                         [line:=next(fid) for row in range(pattern["skipped_rows"])]
                         # update the stats dictionary
-                        stats[pattern_key] = eval(pattern["line_format"])
+                        try:
+                            stats[pattern_key] = eval(pattern["line_format"])
+                        except:
+                            import warnings
+                            warnings.warn(f"pattern key: {pattern_key} has returned wrong parsing result")
 
         return stats
     
@@ -90,6 +94,46 @@ class LptFile:
         self.LPT_SEARCH_PATTERNS[keyname] = dict(start_text=start_text,
                                                  skipped_rows=skipped_rows,
                                                  line_format=line_format)
+        
+    def register_normalization_stats(self) -> None:
+        """
+        register six normalization params to the `stats` method
+        """
+        self.register_new_stats("normalization","   NORMALIZATION", 1, "float(line[2:13])")
+        self.register_new_stats("constant_bg","   NORMALIZATION", 1, "float(line[19:29])")
+        self.register_new_stats("one_over_v_bg","   NORMALIZATION", 1, "float(line[36:47])")
+        self.register_new_stats("sqrt_energy_bg","   NORMALIZATION", 1, "float(line[53:63])")
+        self.register_new_stats("exponential_bg","    BCKG*EXP(.)", 1, "float(line[2:13])")
+        self.register_new_stats("exp_decay_bg","    BCKG*EXP(.)", 1, "float(line[19:29])")
+
+    def register_broadening_stats(self) -> None:
+        """
+        register five broadening params to the `stats` method
+        """
+        self.register_new_stats("temperature","  TEMPERATURE      THICKNESS", 1, "float(line[2:13])")
+        self.register_new_stats("thickness","  TEMPERATURE      THICKNESS", 1, "float(line[19:29])")
+        self.register_new_stats("flight_path_spread","    DELTA-L         DELTA-T-GAUS", 1, "float(line[2:13])")
+        self.register_new_stats("deltag_fwhm","    DELTA-L         DELTA-T-GAUS", 1, "float(line[19:29])")
+        self.register_new_stats("deltae_us","    DELTA-L         DELTA-T-GAUS", 1, "float(line[36:47])")
+
+
+    def register_abundances_stats(self,isotopes:list =[]) -> None:
+        """
+        register final isotopic abundances
+
+        Args:
+            - isotopes (list): A list of isotope names, in the order added to the compound par file
+                               in case of empty list, pleiades will try to read the first 5 isotopes and assign them with numbers 
+        """
+        if isotopes:
+            for num,isotope in enumerate(isotopes):
+                self.register_new_stats(f"weight_{isotope}"," Nuclide    Abundance", num+1, "float(line[12:18])")
+        else:
+            for num in range(5):
+                self.register_new_stats(f"weight_{num}"," Nuclide    Abundance", num+1, "float(line[12:18])")            
+
+
+
 
     def commands(self) -> list:
         """parse and collect the alphanumeric command cards from a SAMMY.LPT file
@@ -107,4 +151,6 @@ class LptFile:
                         line = next(fid)
                         
         return cards
+    
+
 
